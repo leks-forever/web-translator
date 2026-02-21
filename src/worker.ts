@@ -3,8 +3,9 @@ import { pipeline, env, type PipelineType } from '@huggingface/transformers';
 // Skip local check
 env.allowLocalModels = false;
 
-// Most stable and widely used model ID for NLLB-200 in transformers.js
-const MODEL_ID = 'Xenova/nllb-200-distilled-600m';
+// Fine-tuned model for Russian <-> Lezghian translation.
+// Requires ONNX files in the repo — run scripts/convert_to_onnx.sh first.
+const MODEL_ID = 'leks-forever/nllb-200-distilled-600M';
 
 class TranslationPipeline {
     static task: PipelineType = 'translation';
@@ -24,7 +25,20 @@ class TranslationPipeline {
 }
 
 self.onmessage = async (event) => {
-    const { text, src_lang, tgt_lang } = event.data;
+    const { type, text, src_lang, tgt_lang } = event.data;
+
+    // Pre-load the model without translating anything
+    if (type === 'load') {
+        try {
+            await TranslationPipeline.getInstance((progress: any) => {
+                self.postMessage({ status: 'progress', progress });
+            });
+            self.postMessage({ status: 'ready' });
+        } catch (error: any) {
+            self.postMessage({ status: 'error', error: error?.message || 'Failed to load model' });
+        }
+        return;
+    }
 
     try {
         const translator = await TranslationPipeline.getInstance((progress: any) => {
