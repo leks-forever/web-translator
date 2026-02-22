@@ -13,6 +13,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 export default function App() {
   const [modelState, setModelState] = useState<ModelState>('idle');
+  const [workerVersion, setWorkerVersion] = useState(0);
   const [sourceText, setSourceText] = useState('');
   const [targetText, setTargetText] = useState('');
   const [sourceLang, setSourceLang] = useState('rus_Cyrl');
@@ -34,6 +35,7 @@ export default function App() {
   const loadedMB = (totalLoaded / 1e6).toFixed(0);
   const totalMB = totalBytes > 0 ? (totalBytes / 1e6).toFixed(0) : null;
   const ringOffset = RING_CIRCUMFERENCE * (1 - overallPercent / 100);
+  const hasProgress = totalLoaded > 0;
 
   useEffect(() => {
     worker.current = new Worker(new URL('./worker.ts?v=8', import.meta.url), {
@@ -66,7 +68,7 @@ export default function App() {
         setIsTranslating(false);
       } else if (status === 'error') {
         setIsTranslating(false);
-        if (modelState === 'downloading') setModelState('idle');
+        setModelState('idle');
         console.error(error);
       }
     };
@@ -74,13 +76,19 @@ export default function App() {
     return () => {
       worker.current?.terminate();
     };
-  }, []);
+  }, [workerVersion]);
 
   const handleLoadModel = useCallback(() => {
     if (!worker.current) return;
     setModelState('downloading');
     setProgressItems({});
     worker.current.postMessage({ type: 'load' });
+  }, []);
+
+  const handleCancel = useCallback(() => {
+    setModelState('idle');
+    setProgressItems({});
+    setWorkerVersion(v => v + 1);
   }, []);
 
   const handleTranslate = useCallback(() => {
@@ -125,56 +133,68 @@ export default function App() {
 
         {/* Download gate */}
         {modelState !== 'ready' && (
-          <div className="flex flex-col items-center justify-center py-16 gap-8 animate-in fade-in duration-500">
-            <div className="text-center space-y-3 max-w-md">
+          <div className="flex flex-col items-center justify-center py-16 gap-6 animate-in fade-in duration-500">
+            <div className="text-center space-y-2">
               <h2 className="text-2xl font-semibold">Переводчик лезгинского языка</h2>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Перевод выполняется прямо в вашем браузере — текст никуда не отправляется.
-                При первом запуске нужно загрузить языковые данные (~1.9 ГБ).
-                В следующий раз всё откроется мгновенно.
+              <p className="text-muted-foreground text-sm">
+                Перевод прямо в браузере — данные не покидают устройство.
               </p>
             </div>
 
-            {modelState === 'idle' && (
-              <Button size="lg" className="gap-2 h-12 px-8 text-base" onClick={handleLoadModel}>
-                <Download className="w-5 h-5" />
-                Открыть переводчик
-              </Button>
-            )}
+            {/* Ring — always visible */}
+            <div className="relative w-40 h-40">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+                <circle
+                  cx="60" cy="60" r={RING_RADIUS}
+                  fill="none" strokeWidth="8"
+                  className="stroke-muted"
+                />
+                {modelState === 'downloading' && (
+                  <circle
+                    cx="60" cy="60" r={RING_RADIUS}
+                    fill="none" strokeWidth="8" strokeLinecap="round"
+                    className="stroke-primary transition-all duration-500"
+                    strokeDasharray={RING_CIRCUMFERENCE}
+                    strokeDashoffset={ringOffset}
+                  />
+                )}
+              </svg>
+
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                {modelState === 'idle' && (
+                  <button
+                    onClick={handleLoadModel}
+                    className="flex flex-col items-center gap-1.5 hover:opacity-70 active:scale-95 transition-all"
+                  >
+                    <Download className="w-7 h-7" />
+                    <span className="text-xs font-medium leading-tight text-center">Скачать<br/>переводчик</span>
+                  </button>
+                )}
+
+                {modelState === 'downloading' && (
+                  <>
+                    {hasProgress ? (
+                      <>
+                        <span className="text-2xl font-bold tabular-nums leading-none">{loadedMB}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {totalMB ? `из ${totalMB} МБ` : 'МБ'}
+                        </span>
+                      </>
+                    ) : (
+                      <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
 
             {modelState === 'downloading' && (
-              <div className="flex flex-col items-center gap-4">
-                <div className="relative w-36 h-36">
-                  <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
-                    <circle
-                      cx="60" cy="60" r={RING_RADIUS}
-                      fill="none"
-                      strokeWidth="8"
-                      className="stroke-muted"
-                    />
-                    <circle
-                      cx="60" cy="60" r={RING_RADIUS}
-                      fill="none"
-                      strokeWidth="8"
-                      strokeLinecap="round"
-                      className="stroke-primary transition-all duration-300"
-                      strokeDasharray={RING_CIRCUMFERENCE}
-                      strokeDashoffset={ringOffset}
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-xl font-bold tabular-nums">{loadedMB}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {totalMB ? `из ${totalMB} МБ` : 'МБ'}
-                    </span>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground text-center max-w-xs">
-                  Загружаем языковые данные… Не закрывайте вкладку.
-                  <br />
-                  <span className="text-xs">После этого переводчик запустится сразу.</span>
-                </p>
-              </div>
+              <button
+                onClick={handleCancel}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+              >
+                Отмена
+              </button>
             )}
           </div>
         )}
