@@ -2,11 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Progress } from "@/components/ui/progress"
 import { ModeToggle } from "@/components/mode-toggle"
 import { Languages, ArrowRightLeft, Copy, Check, Loader2, Download } from 'lucide-react'
 
 type ModelState = 'idle' | 'downloading' | 'ready'
+type ProgressInfo = { loaded: number; total: number; percent: number }
+
+const RING_RADIUS = 54;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 export default function App() {
   const [modelState, setModelState] = useState<ModelState>('idle');
@@ -15,17 +18,25 @@ export default function App() {
   const [sourceLang, setSourceLang] = useState('rus_Cyrl');
   const [targetLang, setTargetLang] = useState('lez_Cyrl');
   const [isTranslating, setIsTranslating] = useState(false);
-  const [progressItems, setProgressItems] = useState<Record<string, number>>({});
+  const [progressItems, setProgressItems] = useState<Record<string, ProgressInfo>>({});
   const [isCopied, setIsCopied] = useState(false);
 
   const worker = useRef<Worker | null>(null);
 
-  const totalProgress = Object.values(progressItems).length > 0
-    ? Object.values(progressItems).reduce((a, b) => a + b, 0) / Object.values(progressItems).length
-    : 0;
+  const items = Object.values(progressItems);
+  const totalLoaded = items.reduce((a, b) => a + b.loaded, 0);
+  const totalBytes = items.reduce((a, b) => a + b.total, 0);
+  const overallPercent = totalBytes > 0
+    ? Math.min(100, (totalLoaded / totalBytes) * 100)
+    : items.length > 0
+      ? items.reduce((a, b) => a + b.percent, 0) / items.length
+      : 0;
+  const loadedMB = (totalLoaded / 1e6).toFixed(0);
+  const totalMB = totalBytes > 0 ? (totalBytes / 1e6).toFixed(0) : null;
+  const ringOffset = RING_CIRCUMFERENCE * (1 - overallPercent / 100);
 
   useEffect(() => {
-    worker.current = new Worker(new URL('./worker.ts?v=7', import.meta.url), {
+    worker.current = new Worker(new URL('./worker.ts?v=8', import.meta.url), {
       type: 'module'
     });
 
@@ -33,13 +44,20 @@ export default function App() {
       const { status, output, progress, error } = event.data;
 
       if (status === 'progress') {
-        const { file, status: fileStatus, progress: fileProgressValue } = progress;
+        const { file, status: fileStatus, progress: fileProgressValue, loaded, total } = progress;
         if (fileStatus === 'initiate') {
-          setProgressItems(prev => ({ ...prev, [file]: 0 }));
+          setProgressItems(prev => ({ ...prev, [file]: { loaded: 0, total: total ?? 0, percent: 0 } }));
         } else if (fileStatus === 'progress') {
-          setProgressItems(prev => ({ ...prev, [file]: fileProgressValue }));
+          setProgressItems(prev => ({
+            ...prev,
+            [file]: { loaded: loaded ?? 0, total: total ?? 0, percent: fileProgressValue ?? 0 }
+          }));
         } else if (fileStatus === 'done' || fileStatus === 'ready') {
-          setProgressItems(prev => ({ ...prev, [file]: 100 }));
+          setProgressItems(prev => {
+            const existing = prev[file];
+            const t = total ?? existing?.total ?? 0;
+            return { ...prev, [file]: { loaded: t, total: t, percent: 100 } };
+          });
         }
       } else if (status === 'ready') {
         setModelState('ready');
@@ -109,35 +127,52 @@ export default function App() {
         {modelState !== 'ready' && (
           <div className="flex flex-col items-center justify-center py-16 gap-8 animate-in fade-in duration-500">
             <div className="text-center space-y-3 max-w-md">
-              <h2 className="text-2xl font-semibold">Загрузка модели</h2>
+              <h2 className="text-2xl font-semibold">Переводчик лезгинского языка</h2>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                Перевод выполняется прямо в браузере — данные не покидают ваше устройство.
-                Для работы необходимо скачать модель (~1.9 ГБ).
-              </p>
-              <p className="text-xs text-muted-foreground font-mono">
-                leks-forever/nllb-200-distilled-600M
+                Перевод выполняется прямо в вашем браузере — текст никуда не отправляется.
+                При первом запуске нужно загрузить языковые данные (~1.9 ГБ).
+                В следующий раз всё откроется мгновенно.
               </p>
             </div>
 
             {modelState === 'idle' && (
               <Button size="lg" className="gap-2 h-12 px-8 text-base" onClick={handleLoadModel}>
                 <Download className="w-5 h-5" />
-                Скачать модель
+                Открыть переводчик
               </Button>
             )}
 
             {modelState === 'downloading' && (
-              <div className="w-full max-w-md space-y-3">
-                <div className="flex justify-between text-sm font-medium text-muted-foreground">
-                  <span className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Загрузка...
-                  </span>
-                  <span>{Math.round(totalProgress)}%</span>
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative w-36 h-36">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+                    <circle
+                      cx="60" cy="60" r={RING_RADIUS}
+                      fill="none"
+                      strokeWidth="8"
+                      className="stroke-muted"
+                    />
+                    <circle
+                      cx="60" cy="60" r={RING_RADIUS}
+                      fill="none"
+                      strokeWidth="8"
+                      strokeLinecap="round"
+                      className="stroke-primary transition-all duration-300"
+                      strokeDasharray={RING_CIRCUMFERENCE}
+                      strokeDashoffset={ringOffset}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-xl font-bold tabular-nums">{loadedMB}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {totalMB ? `из ${totalMB} МБ` : 'МБ'}
+                    </span>
+                  </div>
                 </div>
-                <Progress value={totalProgress} className="h-2" />
-                <p className="text-xs text-muted-foreground text-center">
-                  Не закрывайте вкладку — после загрузки модель будет кэширована в браузере
+                <p className="text-sm text-muted-foreground text-center max-w-xs">
+                  Загружаем языковые данные… Не закрывайте вкладку.
+                  <br />
+                  <span className="text-xs">После этого переводчик запустится сразу.</span>
                 </p>
               </div>
             )}
@@ -236,8 +271,19 @@ export default function App() {
         )}
 
         {/* Footer */}
-        <footer className="pt-8 border-t text-center text-xs text-muted-foreground">
-          <p>© 2025 LekTranslator</p>
+        <footer className="pt-8 border-t text-center text-xs text-muted-foreground space-y-2">
+          <p>© 2026 LekTranslator</p>
+          <p>
+            Поддержать проект или предложить сотрудничество —{' '}
+            <a
+              href="https://t.me/lezgian_community"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-foreground transition-colors"
+            >
+              Напишите нам в Telegram
+            </a>
+          </p>
         </footer>
       </div>
     </div>

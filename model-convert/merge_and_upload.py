@@ -6,7 +6,7 @@ import os
 import sys
 import glob
 
-MODEL_ID = "leks-forever/nllb-200-distilled-600M"
+MODEL_ID = "leks-forever/nllb-200-distilled-600M-v1"
 ONNX_DIR = "./onnx_export/onnx"
 
 

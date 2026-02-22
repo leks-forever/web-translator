@@ -5,7 +5,7 @@ env.allowLocalModels = false;
 
 // Fine-tuned model for Russian <-> Lezghian translation.
 // Requires ONNX files in the repo — run scripts/convert_to_onnx.sh first.
-const MODEL_ID = 'leks-forever/nllb-200-distilled-600M';
+const MODEL_ID = 'leks-forever/nllb-200-distilled-600M-v1';
 
 class TranslationPipeline {
     static task: PipelineType = 'translation';
