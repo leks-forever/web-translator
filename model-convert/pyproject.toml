@@ -9,4 +9,5 @@ dependencies = [
     "transformers>=4.40,<5.0",
     "torch>=2.2,<2.3",
     "sentencepiece",
+    "numpy>=1.24,<2",
 ]
