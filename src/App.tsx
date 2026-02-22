@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ModeToggle } from "@/components/mode-toggle"
 import { Languages, ArrowRightLeft, Copy, Check, Loader2, Download } from 'lucide-react'
 
@@ -11,6 +12,31 @@ type ProgressInfo = { loaded: number; total: number; percent: number }
 const RING_RADIUS = 54;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const MAX_CHARS = 2000;
+
+const LANGUAGES = [
+  { code: 'rus_Cyrl', name: 'Русский' },
+  { code: 'eng_Latn', name: 'English' },
+  { code: 'tur_Latn', name: 'Türkçe' },
+  { code: 'aze_Latn', name: 'Azərbaycan' },
+  { code: 'ara_Arab', name: 'العربية' },
+  { code: 'deu_Latn', name: 'Deutsch' },
+  { code: 'fra_Latn', name: 'Français' },
+  { code: 'spa_Latn', name: 'Español' },
+  { code: 'por_Latn', name: 'Português' },
+  { code: 'ita_Latn', name: 'Italiano' },
+  { code: 'ukr_Cyrl', name: 'Українська' },
+  { code: 'pol_Latn', name: 'Polski' },
+  { code: 'zho_Hans', name: '中文' },
+  { code: 'jpn_Jpan', name: '日本語' },
+  { code: 'kor_Hang', name: '한국어' },
+  { code: 'hin_Deva', name: 'हिन्दी' },
+  { code: 'ind_Latn', name: 'Bahasa Indonesia' },
+  { code: 'fas_Arab', name: 'فارسی' },
+  { code: 'kat_Geor', name: 'ქართული' },
+  { code: 'hye_Armn', name: 'Հայերեն' },
+  { code: 'kaz_Cyrl', name: 'Қазақша' },
+  { code: 'uzb_Latn', name: "O'zbek" },
+] as const;
 
 export default function App() {
   const [modelState, setModelState] = useState<ModelState>('idle');
@@ -38,6 +64,9 @@ export default function App() {
   const ringOffset = RING_CIRCUMFERENCE * (1 - overallPercent / 100);
   const hasProgress = totalLoaded > 0;
   const isOverLimit = sourceText.length > MAX_CHARS;
+
+  // The non-Lezghian language (always one side is lez_Cyrl)
+  const otherLang = sourceLang === 'lez_Cyrl' ? targetLang : sourceLang;
 
   useEffect(() => {
     worker.current = new Worker(new URL('./worker.ts?v=8', import.meta.url), {
@@ -117,10 +146,63 @@ export default function App() {
     setTargetText(sourceText);
   };
 
+  const handleOtherLangChange = useCallback((newLang: string) => {
+    if (sourceLang === 'lez_Cyrl') {
+      setTargetLang(newLang);
+    } else {
+      setSourceLang(newLang);
+    }
+    setTargetText('');
+  }, [sourceLang]);
+
   const handleCopy = () => {
     navigator.clipboard.writeText(targetText);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const LangLabel = ({ lang, onSwap }: { lang: string; onSwap?: () => void }) => {
+    if (lang === 'lez_Cyrl') {
+      return (
+        <div className="flex items-center justify-between h-8 w-full">
+          <span className="font-medium px-2">Лезгинский</span>
+          {onSwap && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden h-8 w-8 rounded-full transition-transform hover:rotate-180 duration-500"
+              onClick={onSwap}
+            >
+              <ArrowRightLeft className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center justify-between h-8 w-full">
+        <Select value={otherLang} onValueChange={handleOtherLangChange}>
+          <SelectTrigger className="border-none shadow-none h-8 font-medium focus:ring-0 w-auto gap-1 px-2 bg-transparent">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {LANGUAGES.map(l => (
+              <SelectItem key={l.code} value={l.code}>{l.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {onSwap && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden h-8 w-8 rounded-full transition-transform hover:rotate-180 duration-500"
+            onClick={onSwap}
+          >
+            <ArrowRightLeft className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -217,9 +299,7 @@ export default function App() {
               {/* Source Card */}
               <Card className={`shadow-none bg-transparent lg:bg-card lg:shadow-sm border-none lg:border transition-colors ${isOverLimit ? 'lg:border-destructive' : ''}`}>
                 <CardHeader className="px-4 py-3 lg:px-6 lg:py-4 border-b">
-                  <div className="flex items-center h-8 font-medium px-2">
-                    {sourceLang === 'rus_Cyrl' ? 'Русский' : 'Лезгинский'}
-                  </div>
+                  <LangLabel lang={sourceLang} onSwap={handleSwapLanguages} />
                 </CardHeader>
                 <CardContent className="p-0">
                   <Textarea
@@ -241,28 +321,26 @@ export default function App() {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="rounded-full h-9 w-9 lg:h-10 lg:w-10 shadow-sm transition-transform hover:rotate-180 duration-500"
+                  className="hidden lg:flex rounded-full h-10 w-10 shadow-sm transition-transform hover:rotate-180 duration-500"
                   onClick={handleSwapLanguages}
                 >
-                  <ArrowRightLeft className="w-4 h-4 lg:w-5 lg:h-5" />
+                  <ArrowRightLeft className="w-5 h-5" />
                 </Button>
                 <Button
-                  className="hidden lg:flex rounded-full h-14 w-14 shadow-lg active:scale-95 transition-all"
+                  className="rounded-full h-12 w-12 lg:h-14 lg:w-14 shadow-lg active:scale-95 transition-all"
                   disabled={!sourceText.trim() || isTranslating || isOverLimit}
                   onClick={handleTranslate}
                 >
-                  {isTranslating ? <Loader2 className="w-6 h-6 animate-spin" /> : <Languages className="w-6 h-6" />}
+                  {isTranslating ? <Loader2 className="w-5 h-5 lg:w-6 lg:h-6 animate-spin" /> : <Languages className="w-5 h-5 lg:w-6 lg:h-6" />}
                 </Button>
               </div>
 
               {/* Target Card */}
               <Card className="border-none shadow-none bg-transparent lg:bg-card lg:border lg:shadow-sm relative overflow-hidden">
                 <CardHeader className="px-4 py-3 lg:px-6 lg:py-4 border-b flex flex-row items-center justify-between">
-                  <div className="flex items-center h-8 font-medium px-2">
-                    {targetLang === 'rus_Cyrl' ? 'Русский' : 'Лезгинский'}
-                  </div>
+                  <LangLabel lang={targetLang} />
                   {targetText && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 ml-2" onClick={handleCopy}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 ml-2 shrink-0" onClick={handleCopy}>
                       {isCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                     </Button>
                   )}
@@ -285,22 +363,6 @@ export default function App() {
               </Card>
             </div>
 
-            {/* Mobile Action Button */}
-            <div className="flex lg:hidden justify-center">
-              <Button
-                size="lg"
-                className="w-full h-14 text-lg rounded-xl shadow-lg"
-                disabled={!sourceText.trim() || isTranslating || isOverLimit}
-                onClick={handleTranslate}
-              >
-                {isTranslating ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Переводим...
-                  </>
-                ) : 'Перевести'}
-              </Button>
-            </div>
           </>
         )}
 
