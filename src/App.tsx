@@ -10,6 +10,7 @@ type ProgressInfo = { loaded: number; total: number; percent: number }
 
 const RING_RADIUS = 54;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const MAX_CHARS = 2000;
 
 export default function App() {
   const [modelState, setModelState] = useState<ModelState>('idle');
@@ -36,6 +37,7 @@ export default function App() {
   const totalMB = totalBytes > 0 ? (totalBytes / 1e6).toFixed(0) : null;
   const ringOffset = RING_CIRCUMFERENCE * (1 - overallPercent / 100);
   const hasProgress = totalLoaded > 0;
+  const isOverLimit = sourceText.length > MAX_CHARS;
 
   useEffect(() => {
     worker.current = new Worker(new URL('./worker.ts?v=8', import.meta.url), {
@@ -206,7 +208,7 @@ export default function App() {
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-4 lg:gap-6 items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
 
               {/* Source Card */}
-              <Card className="border-none shadow-none bg-transparent lg:bg-card lg:border lg:shadow-sm">
+              <Card className={`shadow-none bg-transparent lg:bg-card lg:shadow-sm border-none lg:border transition-colors ${isOverLimit ? 'lg:border-destructive' : ''}`}>
                 <CardHeader className="px-4 py-3 lg:px-6 lg:py-4 border-b">
                   <div className="flex items-center h-8 font-medium px-2">
                     {sourceLang === 'rus_Cyrl' ? 'Русский' : 'Лезгинский'}
@@ -219,6 +221,11 @@ export default function App() {
                     value={sourceText}
                     onChange={(e) => setSourceText(e.target.value)}
                   />
+                  <div className="px-4 pb-3 lg:px-6 lg:pb-4 flex justify-end">
+                    <span className={`text-xs tabular-nums transition-colors ${isOverLimit ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                      {sourceText.length} / {MAX_CHARS}
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -234,7 +241,7 @@ export default function App() {
                 </Button>
                 <Button
                   className="hidden lg:flex rounded-full h-14 w-14 shadow-lg active:scale-95 transition-all"
-                  disabled={!sourceText.trim() || isTranslating}
+                  disabled={!sourceText.trim() || isTranslating || isOverLimit}
                   onClick={handleTranslate}
                 >
                   {isTranslating ? <Loader2 className="w-6 h-6 animate-spin" /> : <Languages className="w-6 h-6" />}
@@ -276,7 +283,7 @@ export default function App() {
               <Button
                 size="lg"
                 className="w-full h-14 text-lg rounded-xl shadow-lg"
-                disabled={!sourceText.trim() || isTranslating}
+                disabled={!sourceText.trim() || isTranslating || isOverLimit}
                 onClick={handleTranslate}
               >
                 {isTranslating ? (
