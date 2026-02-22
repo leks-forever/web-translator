@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ModeToggle } from "@/components/mode-toggle"
 import { Languages, ArrowRightLeft, Copy, Check, Loader2, Download } from 'lucide-react'
 
@@ -12,31 +11,6 @@ type ProgressInfo = { loaded: number; total: number; percent: number }
 const RING_RADIUS = 54;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const MAX_CHARS = 2000;
-
-const LANGUAGES = [
-  { code: 'rus_Cyrl', name: 'Русский' },
-  { code: 'eng_Latn', name: 'English' },
-  { code: 'tur_Latn', name: 'Türkçe' },
-  { code: 'aze_Latn', name: 'Azərbaycan' },
-  { code: 'ara_Arab', name: 'العربية' },
-  { code: 'deu_Latn', name: 'Deutsch' },
-  { code: 'fra_Latn', name: 'Français' },
-  { code: 'spa_Latn', name: 'Español' },
-  { code: 'por_Latn', name: 'Português' },
-  { code: 'ita_Latn', name: 'Italiano' },
-  { code: 'ukr_Cyrl', name: 'Українська' },
-  { code: 'pol_Latn', name: 'Polski' },
-  { code: 'zho_Hans', name: '中文' },
-  { code: 'jpn_Jpan', name: '日本語' },
-  { code: 'kor_Hang', name: '한국어' },
-  { code: 'hin_Deva', name: 'हिन्दी' },
-  { code: 'ind_Latn', name: 'Bahasa Indonesia' },
-  { code: 'fas_Arab', name: 'فارسی' },
-  { code: 'kat_Geor', name: 'ქართული' },
-  { code: 'hye_Armn', name: 'Հայերեն' },
-  { code: 'kaz_Cyrl', name: 'Қазақша' },
-  { code: 'uzb_Latn', name: "O'zbek" },
-] as const;
 
 export default function App() {
   const [modelState, setModelState] = useState<ModelState>('idle');
@@ -64,9 +38,6 @@ export default function App() {
   const ringOffset = RING_CIRCUMFERENCE * (1 - overallPercent / 100);
   const hasProgress = totalLoaded > 0;
   const isOverLimit = sourceText.length > MAX_CHARS;
-
-  // The non-Lezghian language (always one side is lez_Cyrl)
-  const otherLang = sourceLang === 'lez_Cyrl' ? targetLang : sourceLang;
 
   useEffect(() => {
     worker.current = new Worker(new URL('./worker.ts?v=8', import.meta.url), {
@@ -146,63 +117,10 @@ export default function App() {
     setTargetText(sourceText);
   };
 
-  const handleOtherLangChange = useCallback((newLang: string) => {
-    if (sourceLang === 'lez_Cyrl') {
-      setTargetLang(newLang);
-    } else {
-      setSourceLang(newLang);
-    }
-    setTargetText('');
-  }, [sourceLang]);
-
   const handleCopy = () => {
     navigator.clipboard.writeText(targetText);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
-  };
-
-  const LangLabel = ({ lang, onSwap }: { lang: string; onSwap?: () => void }) => {
-    if (lang === 'lez_Cyrl') {
-      return (
-        <div className="flex items-center justify-between h-8 w-full">
-          <span className="font-medium px-2">Лезгинский</span>
-          {onSwap && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden h-8 w-8 rounded-full transition-transform hover:rotate-180 duration-500"
-              onClick={onSwap}
-            >
-              <ArrowRightLeft className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-      );
-    }
-    return (
-      <div className="flex items-center justify-between h-8 w-full">
-        <Select value={otherLang} onValueChange={handleOtherLangChange}>
-          <SelectTrigger className="border-none shadow-none h-8 font-medium focus:ring-0 w-auto gap-1 px-2 bg-transparent">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {LANGUAGES.map(l => (
-              <SelectItem key={l.code} value={l.code}>{l.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {onSwap && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden h-8 w-8 rounded-full transition-transform hover:rotate-180 duration-500"
-            onClick={onSwap}
-          >
-            <ArrowRightLeft className="w-4 h-4" />
-          </Button>
-        )}
-      </div>
-    );
   };
 
   return (
@@ -299,7 +217,19 @@ export default function App() {
               {/* Source Card */}
               <Card className={`shadow-none bg-transparent lg:bg-card lg:shadow-sm border-none lg:border transition-colors ${isOverLimit ? 'lg:border-destructive' : ''}`}>
                 <CardHeader className="px-4 py-3 lg:px-6 lg:py-4 border-b">
-                  <LangLabel lang={sourceLang} onSwap={handleSwapLanguages} />
+                  <div className="flex items-center justify-between h-8">
+                    <div className="font-medium px-2">
+                      {sourceLang === 'rus_Cyrl' ? 'Русский' : 'Лезгинский'}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="lg:hidden h-8 w-8 rounded-full transition-transform hover:rotate-180 duration-500"
+                      onClick={handleSwapLanguages}
+                    >
+                      <ArrowRightLeft className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   <Textarea
@@ -338,9 +268,11 @@ export default function App() {
               {/* Target Card */}
               <Card className="border-none shadow-none bg-transparent lg:bg-card lg:border lg:shadow-sm relative overflow-hidden">
                 <CardHeader className="px-4 py-3 lg:px-6 lg:py-4 border-b flex flex-row items-center justify-between">
-                  <LangLabel lang={targetLang} />
+                  <div className="flex items-center h-8 font-medium px-2">
+                    {targetLang === 'rus_Cyrl' ? 'Русский' : 'Лезгинский'}
+                  </div>
                   {targetText && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 ml-2 shrink-0" onClick={handleCopy}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 ml-2" onClick={handleCopy}>
                       {isCopied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                     </Button>
                   )}
