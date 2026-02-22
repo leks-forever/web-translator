@@ -133,26 +133,26 @@ export default function App() {
 
         {/* Download gate */}
         {modelState !== 'ready' && (
-          <div className="flex flex-col items-center justify-center py-16 gap-6 animate-in fade-in duration-500">
+          <div className="flex flex-col items-center justify-center py-16 gap-8 animate-in fade-in duration-500">
             <div className="text-center space-y-2">
               <h2 className="text-2xl font-semibold">Переводчик лезгинского языка</h2>
               <p className="text-muted-foreground text-sm">
-                Перевод прямо в браузере — данные не покидают устройство.
+                Работает без интернета — прямо на вашем телефоне.
               </p>
             </div>
 
-            {/* Ring — always visible */}
-            <div className="relative w-40 h-40">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+            {/* Ring button */}
+            <div className="relative w-52 h-52">
+              <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 120 120">
                 <circle
                   cx="60" cy="60" r={RING_RADIUS}
-                  fill="none" strokeWidth="8"
-                  className="stroke-muted"
+                  fill="none" strokeWidth="4"
+                  className="stroke-border"
                 />
                 {modelState === 'downloading' && (
                   <circle
                     cx="60" cy="60" r={RING_RADIUS}
-                    fill="none" strokeWidth="8" strokeLinecap="round"
+                    fill="none" strokeWidth="4" strokeLinecap="round"
                     className="stroke-primary transition-all duration-500"
                     strokeDasharray={RING_CIRCUMFERENCE}
                     strokeDashoffset={ringOffset}
@@ -160,30 +160,30 @@ export default function App() {
                 )}
               </svg>
 
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+              <div className="absolute inset-0 flex items-center justify-center">
                 {modelState === 'idle' && (
                   <button
                     onClick={handleLoadModel}
-                    className="flex flex-col items-center gap-1.5 hover:opacity-70 active:scale-95 transition-all"
+                    className="w-40 h-40 rounded-full bg-primary text-primary-foreground flex flex-col items-center justify-center gap-2 shadow-2xl hover:scale-105 active:scale-95 transition-transform duration-200"
                   >
-                    <Download className="w-7 h-7" />
-                    <span className="text-xs font-medium leading-tight text-center">Скачать<br/>переводчик</span>
+                    <Download className="w-9 h-9" />
+                    <span className="text-sm font-semibold leading-tight text-center">Скачать<br/>переводчик</span>
                   </button>
                 )}
 
                 {modelState === 'downloading' && (
-                  <>
+                  <div className="w-40 h-40 rounded-full bg-muted/20 border border-border flex flex-col items-center justify-center gap-1">
                     {hasProgress ? (
                       <>
-                        <span className="text-2xl font-bold tabular-nums leading-none">{loadedMB}</span>
+                        <span className="text-3xl font-bold tabular-nums leading-none">{loadedMB}</span>
                         <span className="text-xs text-muted-foreground">
                           {totalMB ? `из ${totalMB} МБ` : 'МБ'}
                         </span>
                       </>
                     ) : (
-                      <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
+                      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </div>
