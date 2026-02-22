@@ -49,19 +49,40 @@ def main():
 
     # Step 1: Merge decoder + decoder_with_past into merged decoder
     merged_path = os.path.join(ONNX_DIR, "decoder_model_merged.onnx")
+    merged_data_path = os.path.join(ONNX_DIR, "decoder_model_merged.onnx_data")
     if os.path.exists(merged_path):
-        log(f"==> decoder_model_merged.onnx already exists, skipping merge")
+        log("==> decoder_model_merged.onnx already exists, skipping merge")
     else:
         log("==> Merging decoder_model.onnx + decoder_with_past_model.onnx ...")
+        import onnx
         from optimum.onnx.graph_transformations import merge_decoders
-        merge_decoders(
+
+        # Use save_path=None to get the ModelProto back without saving.
+        # This avoids the ir_version validation error and the 2GB protobuf limit.
+        merged = merge_decoders(
             decoder=os.path.join(ONNX_DIR, "decoder_model.onnx"),
             decoder_with_past=os.path.join(ONNX_DIR, "decoder_with_past_model.onnx"),
-            save_path=merged_path,
+            save_path=None,
             strict=False,
         )
-        size_mb = os.path.getsize(merged_path) / 1e6
-        log(f"  Saved: decoder_model_merged.onnx ({size_mb:.0f} MB)")
+
+        # Fix ir_version (merge_decoders leaves it unset → checker rejects it)
+        merged.ir_version = 8
+        log(f"  Merged graph: {len(merged.graph.node)} nodes")
+
+        # Save with external data to avoid the 2GB protobuf inline limit
+        log("==> Saving merged model with external data ...")
+        onnx.save_model(
+            merged,
+            merged_path,
+            save_as_external_data=True,
+            all_tensors_to_one_file=True,
+            location="decoder_model_merged.onnx_data",
+            convert_attribute=False,
+        )
+        graph_mb = os.path.getsize(merged_path) / 1e6
+        data_mb  = os.path.getsize(merged_data_path) / 1e6
+        log(f"  Saved: decoder_model_merged.onnx ({graph_mb:.0f} MB graph + {data_mb:.0f} MB data)")
 
     # Step 2: Quantize merged decoder
     merged_q_path = os.path.join(ONNX_DIR, "decoder_model_merged_quantized.onnx")
