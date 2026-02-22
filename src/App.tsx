@@ -64,6 +64,7 @@ export default function App() {
           });
         }
       } else if (status === 'ready') {
+        localStorage.setItem('modelCached', '1');
         setModelState('ready');
       } else if (status === 'complete') {
         setTargetText(output);
@@ -74,6 +75,12 @@ export default function App() {
         console.error(error);
       }
     };
+
+    // Auto-load from cache if model was previously downloaded
+    if (localStorage.getItem('modelCached') === '1') {
+      setModelState('downloading');
+      worker.current.postMessage({ type: 'load' });
+    }
 
     return () => {
       worker.current?.terminate();
