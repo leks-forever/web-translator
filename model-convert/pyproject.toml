@@ -1,0 +1,12 @@
+[project]
+name = "model-convert"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = [
+    "optimum[exporters,onnxruntime]>=1.20,<2.0",
+    "onnxruntime",
+    "huggingface_hub>=0.20",
+    "transformers>=4.40,<5.0",
+    "torch>=2.2,<2.3",
+    "sentencepiece",
+]
